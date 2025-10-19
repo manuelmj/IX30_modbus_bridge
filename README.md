@@ -8,6 +8,10 @@
 
 **IX30 Modbus Bridge** es un gateway bidireccional que sincroniza estados entre GPIO/puertos analógicos físicos y registros Modbus TCP. Implementa arquitectura hexagonal (Ports & Adapters) para máxima flexibilidad, testabilidad y mantenibilidad.
 
+Ix30 modbus bridge es una implmentacion especifica para el router industrial DIGI IX30, el cual cuenta con 4 puertos digitales y 4 puertos analogicos. Esta aplicacion permite exponer estos puertos a traves del protocolo Modbus TCP, permitiendo la lectura y escritura de los estados de los GPIOs y los valores analogicos mediante coils y holding registers respectivamente. Esta integracion nos permite conectar el IX30 con sistemas SCADA, PLCs u otros dispositivos compatibles con Modbus TCP, facilitando la monitorizacion y control remoto de los puertos digitales y analogicos del IX30.
+
+
+
 ### 🎯 Funcionalidades Principales
 
 - **🔌 GPIO Sync**: Sincronización bidireccional entre GPIO físicos (1-4) y Coils Modbus (1-4)
