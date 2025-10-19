@@ -1,13 +1,3 @@
-"""
-APPLICATION SERVICES - Se encarga de EJECUTAR y COORDINAR.
-
-Esta capa:
-✅ Recibe dependencias ya ensambladas
-✅ Maneja threading y ejecución
-✅ Coordina servicios
-❌ NO crea implementaciones concretas
-❌ NO conoce infrastructure
-"""
 
 import threading
 import logging

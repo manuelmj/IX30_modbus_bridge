@@ -1,12 +1,4 @@
-"""
-MAIN - Punto de entrada que conecta Composition Root con Application Runner.
 
-Este main:
-✅ Usa Composition Root para ensamblar
-✅ Usa Application Runner para ejecutar
-✅ Maneja configuración de alto nivel
-❌ NO conoce implementaciones concretas
-"""
 import logging
 import signal
 import sys
