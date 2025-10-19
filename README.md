@@ -8,7 +8,9 @@
 
 **IX30 Modbus Bridge** es un gateway bidireccional que sincroniza estados entre GPIO/puertos analógicos físicos y registros Modbus TCP. Implementa arquitectura hexagonal (Ports & Adapters) para máxima flexibilidad, testabilidad y mantenibilidad.
 
-Ix30 modbus bridge es una implmentacion especifica para el router industrial DIGI IX30, el cual cuenta con 4 puertos digitales y 4 puertos analogicos. Esta aplicacion permite exponer estos puertos a traves del protocolo Modbus TCP, permitiendo la lectura y escritura de los estados de los GPIOs y los valores analogicos mediante coils y holding registers respectivamente. Esta integracion nos permite conectar el IX30 con sistemas SCADA, PLCs u otros dispositivos compatibles con Modbus TCP, facilitando la monitorizacion y control remoto de los puertos digitales y analogicos del IX30.
+**IX30 Modbus Bridge** es una implementación específica para el **router industrial DIGI IX30**, el cual cuenta con 4 puertos digitales y 4 puertos analógicos. Esta aplicación permite exponer estos puertos a través del protocolo Modbus TCP, permitiendo la lectura y escritura de los estados de los GPIOs y los valores analógicos mediante coils y holding registers respectivamente. 
+
+Esta integración nos permite conectar el IX30 con sistemas SCADA, PLCs u otros dispositivos compatibles con Modbus TCP, facilitando la monitorización y control remoto de los puertos digitales y analógicos del IX30.
 
 
 
@@ -20,52 +22,6 @@ Ix30 modbus bridge es una implmentacion especifica para el router industrial DIG
 - **🔄 Sync Services**: Servicios de sincronización automática en tiempo real
 - **⚡ Threading**: Manejo concurrente de múltiples servicios
 - **🏗️ Clean Architecture**: Implementación ejemplar de patrones SOLID
-
-## 🏛️ Arquitectura
-
-### Arquitectura Hexagonal (Ports & Adapters)
-
-```
-┌─────────────────────────────────────────────┐
-│                  MAIN.PY                    │
-│            (Entry Point)                    │
-└──────────────┬──────────────────────────────┘
-               │
-┌─────────────────────────────────────────────┐
-│               COMPOSITION                   │
-│   ┌─────────────┐ ┌─────────────┐          │
-│   │   Config    │ │   Composer  │          │
-│   └─────────────┘ └─────────────┘          │
-│   ┌─────────────────────────────────────┐   │
-│   │         Runner                      │   │
-│   │      (Threading & Lifecycle)        │   │
-│   └─────────────────────────────────────┘   │
-└──────────────┬──────────────────────────────┘
-               │
-┌─────────────────────────────────────────────┐
-│              APPLICATION                    │
-│   ┌──────────────────┐ ┌─────────────────┐  │
-│   │ GPIOModbusHandler│ │AnalogModbusHandler│ │
-│   │    (Use Cases)   │ │   (Use Cases)    │  │
-│   └──────────────────┘ └─────────────────┘  │
-└──────────────┬──────────────────────────────┘
-               │
-┌─────────────────────────────────────────────┐
-│                 DOMAIN                      │
-│   ┌─────────────┐ ┌─────────────┐          │
-│   │   Ports     │ │   Models    │          │
-│   │ (Interfaces)│ │ (Entities)  │          │
-│   └─────────────┘ └─────────────┘          │
-└──────────────┬──────────────────────────────┘
-               │
-┌─────────────────────────────────────────────┐
-│            INFRASTRUCTURE                   │
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────┐ │
-│ │GPIO Adapter │ │Modbus Client│ │Modbus   │ │
-│ │   (HW)      │ │  Adapter    │ │ Server  │ │
-│ └─────────────┘ └─────────────┘ └─────────┘ │
-└─────────────────────────────────────────────┘
-```
 
 
 ## 🔄 Mapeo de Datos
@@ -86,40 +42,148 @@ Ix30 modbus bridge es una implmentacion especifica para el router industrial DIG
 | Canal 3         | 40005-40006      | Float32 (2 registros) |
 | Canal 4         | 40007-40008      | Float32 (2 registros) |
 
-## 🚀 Instalación
+## 🚀 Instalación y Despliegue
 
 ### Prerrequisitos
-- Python 3.11+
-- pip o poetry
+- **Desarrollo**: Python 3.11+, Git
+- **Producción**: Router DIGI IX30 con acceso SSH
+- **Red**: Conectividad SSH entre PC de desarrollo y DIGI IX30
 
-### Instalar Dependencias
+### 📋 Método 1: Despliegue Remoto (Recomendado)
+
+#### 🌐 Paso 1: Upload al DIGI IX30
+```bash
+# Dar permisos de ejecución al script
+chmod +x upload_compressed.sh
+
+# Enviar proyecto completo al DIGI IX30 vía SSH
+./upload_compressed.sh <usuario> <ip_digi_ix30>
+
+# Ejemplo:
+./upload_compressed.sh root 192.168.1.100
+```
+
+**¿Qué hace el script `upload_compressed.sh`?**
+1. **Comprime** el directorio `src/` → `IX30_modbus_bridge.tar.gz`
+2. **Copia** el script de instalación a `packages/`
+3. **Envía** todo el paquete al DIGI via SCP a `/tmp/packages/`
+4. **Transfiere**: Código fuente + dependencias + instalador
+
+#### 🔧 Paso 2: Instalación en el DIGI IX30
+```bash
+# Conectarse al DIGI IX30 por SSH
+ssh root@192.168.1.100
+
+# Ejecutar instalación automática
+cd /tmp/packages
+chmod +x install_ix30_bridge.sh
+./install_ix30_bridge.sh
+```
+
+**¿Qué hace el script `install_ix30_bridge.sh`?**
+1. **Verifica** dependencias (pymodbus 3.11.1)
+2. **Instala** pymodbus si no está presente
+3. **Extrae** el código fuente a `/opt/custom/main/`
+4. **Limpia** procesos anteriores si existen
+5. **Inicia** el servicio automáticamente (opcional)
+
+#### 📺 Salida Esperada de la Instalación
+```bash
+Instalando IX30 Modbus Bridge...
+🔹 pymodbus ya está instalado en la versión 3.11.1, omitiendo instalación.
+✅ IX30 Modbus Bridge instalado correctamente en /opt/custom/.
+desea ejecutar el puente modbus ahora? (s/n) s
+Iniciando IX30 Modbus Bridge...
+✅ Puente modbus iniciado correctamente.
+  PID TTY          TIME CMD
+ 1234 pts/0    00:00:00 python3
+```
+
+### 📋 Método 2: Instalación Manual
+
+#### Desarrollo Local
 ```bash
 # Clonar repositorio
 git clone <repository-url>
 cd ix30_modbus_bridge
 
 # Instalar dependencias
-pip install pymodbus
+pip install pymodbus==3.11.1
+
+# Ejecutar desde src/
+cd src
+python main.py
 ```
 
 ### Configuración
 ```python
-# Las configuraciones se manejan en composition/config.py
+# composition/config.py
 class ServiceConfig:
-    server_ip: str = "0.0.0.0"     # IP del servidor Modbus 
+    server_ip: str = "0.0.0.0"     # IP del servidor Modbus (todas las interfaces)
     server_port: int = 5020        # Puerto del servidor Modbus
-    client_ip: str = "127.0.0.1"   # IP del servidor modbus (en este caso el local)
-    client_port: int = 5020        # Puerto al que que se conecta el cliente Modbus
+    client_ip: str = "127.0.0.1"   # IP del cliente Modbus (loopback)
+    client_port: int = 5020        # Puerto del cliente Modbus
 ```
 
-## 🎮 Uso
-
-### Ejecución Básica
+#### Personalización de la Configuración
 ```bash
+# Editar configuración antes del despliegue
+nano src/composition/config.py
+
+# O después del despliegue en el DIGI
+ssh root@192.168.1.100
+nano /opt/custom/main/composition/config.py
+```
+
+## 🎮 Uso y Operación
+
+### 🚀 Inicio del Servicio
+
+#### En el DIGI IX30 (Producción)
+```bash
+# Método 1: Inicio automático (post-instalación)
+# Responder 's' cuando se pregunte: "desea ejecutar el puente modbus ahora? (s/n)"
+
+# Método 2: Inicio manual
+ssh root@192.168.1.100
+python3 /opt/custom/main/main.py &
+
+```
+
+#### En Desarrollo Local
+```bash
+cd src
 python main.py
 ```
 
-### Detener la Aplicación
+### 📊 Verificar Estado del Servicio
+
+#### Verificar Proceso Activo
+```bash
+# En el DIGI IX30
+ps | grep "python3 /opt/custom/main/main.py" | grep -v grep
+
+# Verificar puerto Modbus
+netstat -tlnp | grep :5020
+```
+
+#### Logs del Sistema
+```bash
+# Ver logs en tiempo real (desarrollo)
+python3 /opt/custom/main/main.py
+
+# Logs típicos al iniciar:
+2024-10-19 10:00:00 - root - INFO - Iniciando IX30 Modbus Bridge...
+2024-10-19 10:00:01 - composition.composer - INFO - Servicios ensamblados correctamente
+2024-10-19 10:00:02 - application.gpio_modbus_handler - INFO - GPIOModbusHandler iniciado con mapeo GPIO1-4 → Coil1-4
+2024-10-19 10:00:03 - application.analog_modbus_handler - INFO - AnalogModbusHandler iniciado - 2 registros por canal
+2024-10-19 10:00:04 - infrastructure.modbus_server_adapter - INFO - Servidor Modbus iniciado en 0.0.0.0:5020
+2024-10-19 10:00:05 - root - INFO - Aplicación ejecutándose. Presiona Ctrl+C para detener.
+```
+
+### 🛑 Detener el Servicio
+
+#### Detener Proceso
 ```bash
 # Presionar Ctrl+C para shutdown graceful
 ^C
