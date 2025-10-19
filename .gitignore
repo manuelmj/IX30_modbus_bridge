@@ -1,0 +1,103 @@
+# ======================================
+# 🐍 Python
+# ======================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos temporales de compilación
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ======================================
+# 🧪 Testing / Coverage
+# ======================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# ======================================
+# 📦 Entornos virtuales
+# ======================================
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.virtual-env/
+*.env
+*.venv
+
+# ======================================
+# ⚙️ Configuración local / IDE
+# ======================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ======================================
+# 🐋 Docker / Contenedores
+# ======================================
+docker-compose.override.yml
+*.pid
+*.log
+*.sock
+
+# ======================================
+# 🔐 Credenciales / Variables
+# ======================================
+.env
+.env.*
+secrets/
+*.pem
+*.key
+*.crt
+
+# ======================================
+# 📄 Archivos temporales del sistema
+# ======================================
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ======================================
+# 🧰 Documentación / Notebooks
+# ======================================
+.ipynb_checkpoints
+docs/_build/
+site/
+
+# ======================================
+# 🧱 Compilados (Cython / Rust / etc)
+# ======================================
+*.pyd
+*.so
+*.dll
+*.dylib
+target/
