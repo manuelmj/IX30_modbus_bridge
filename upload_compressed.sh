@@ -27,15 +27,8 @@ if [ $? -ne 0 ]; then
     exit 2
 fi
 
-# mv "$ARCHIVE_NAME" packages/
+mv "$ARCHIVE_NAME" packages/
 
-# LOCAL_PATH="packages/$ARCHIVE_NAME"
-# ARCHIVE_NAME="IX30_modbus_bridge_packages".tar.gz
-
-# echo "🔹 Comprimiendo $LOCAL_PATH en $ARCHIVE_NAME ..."
-# tar -czf "$ARCHIVE_NAME" -C "$(dirname "$LOCAL_PATH")" "$(basename "$LOCAL_PATH")"
-
-# mv "$ARCHIVE_NAME" packages/
 
 DIR_TO_SEND="packages"
 cp install_ix30_bridge.sh "$DIR_TO_SEND/"

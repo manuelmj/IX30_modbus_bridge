@@ -54,7 +54,7 @@ def main():
             gpio_sync_service=services[ServiceType.GPIO_SYNC_SERVICE],
             analog_sync_service=services[ServiceType.ANALOG_SYNC_SERVICE]
         )
-        
+       
         setup_signal_handling(runner)
         
         _logger.info("Iniciando IX30 Modbus Bridge...")

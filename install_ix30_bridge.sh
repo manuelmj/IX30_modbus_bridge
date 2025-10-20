@@ -1,17 +1,42 @@
 #!/bin/bash
 
+# ================================
+# CONFIGURACIÓN - VARIABLES DE RUTAS
+# ================================
+
+# Rutas de archivos y directorios
 ARCHIVE_PATH="/tmp/packages/"
-ARCHIVE_NAME="IX30_modbus_bridge".tar.gz
+ARCHIVE_NAME="IX30_modbus_bridge.tar.gz"
 PYTHON_PACKAGE_PATH="/tmp/packages/pymodbus-3.11.1-py3-none-any.whl"
+FINAL_PATH="/etc/config/scripts/"
+APP_NAME="IX30 Modbus Bridge"
 
-FINAL_PATH="/opt/custom/"
+# Rutas temporales
+TEMP_EXTRACT_PATH="/tmp/"
+TEMP_SRC_DIR="/tmp/src/"
+TEMP_MAIN_DIR="/tmp/main/"
 
+# Rutas de la aplicación
+APP_INSTALL_PATH="${FINAL_PATH}main/"
+APP_MAIN_SCRIPT="${APP_INSTALL_PATH}main.py"
+APP_EXECUTABLE="python3 ${APP_MAIN_SCRIPT}"
 
-PYMODBUS_VERSION=$(pip show pymodbus | grep  "Version: 3.11.1" > /dev/null 2>&1; echo $?)
+# Comandos de sistema
+PYTHON_CMD="python3"
+PIP_CMD="pip"
+PS_CMD="ps"
+GREP_CMD="grep"
+AWK_CMD="awk"
+KILL_CMD="kill"
 
-echo "Instalando IX30 Modbus Bridge..."
-tar -xzf "$ARCHIVE_PATH/$ARCHIVE_NAME" -C /tmp/
+# ================================
+# LÓGICA DE INSTALACIÓN
+# ================================
 
+PYMODBUS_VERSION=$(${PIP_CMD} show pymodbus | ${GREP_CMD} "Version: 3.11.1" > /dev/null 2>&1; echo $?)
+
+echo "Instalando ${APP_NAME}..."
+tar -xzf "${ARCHIVE_PATH}${ARCHIVE_NAME}" -C ${TEMP_EXTRACT_PATH}
 
 if [ $? -ne 0 ]; then
     echo "❌ Error al descomprimir el archivo."
@@ -19,7 +44,7 @@ if [ $? -ne 0 ]; then
 fi
 
 if [ $PYMODBUS_VERSION -ne 0 ]; then
-    pip install "$PYTHON_PACKAGE_PATH"
+    ${PIP_CMD} install "${PYTHON_PACKAGE_PATH}"
 else 
     echo "🔹 pymodbus ya está instalado en la versión 3.11.1, omitiendo instalación."
 fi
@@ -29,76 +54,83 @@ if [ $? -ne 0 ]; then
     exit 2
 fi
 
-if [ ! -d $FINAL_PATH ]; then
-    mkdir -p $FINAL_PATH
+if [ ! -d ${FINAL_PATH} ]; then
+    mkdir -p ${FINAL_PATH}
     if [ $? -ne 0 ]; then
-        echo "❌ Error al crear el directorio $FINAL_PATH."
+        echo "❌ Error al crear el directorio ${FINAL_PATH}."
         exit 3
     fi
 fi
 
-
-if [ -d /tmp/main/ ]; then
-    rm -rf /tmp/main/
+if [ -d ${TEMP_MAIN_DIR} ]; then
+    rm -rf ${TEMP_MAIN_DIR}
 fi
 
-mv /tmp/src/ /tmp/main/
+mv ${TEMP_SRC_DIR} ${TEMP_MAIN_DIR}
 
 if [ $? -ne 0 ]; then
     echo "❌ Error al renombrar el directorio descomprimido."
     exit 4
 fi
 
-if [ -d "$FINAL_PATH/main" ]; then
-    rm -rf $FINAL_PATH/main
+if [ -d "${APP_INSTALL_PATH}" ]; then
+    rm -rf ${APP_INSTALL_PATH}
     if [ $? -ne 0 ]; then
-        echo "❌ Error al eliminar el directorio existente $FINAL_PATH/main."
+        echo "❌ Error al eliminar el directorio existente ${APP_INSTALL_PATH}."
         exit 4
     fi
 fi
 
-mv /tmp/main/ $FINAL_PATH
+mv ${TEMP_MAIN_DIR} ${FINAL_PATH}
 
 if [ $? -ne 0 ]; then
-    echo "❌ Error al mover los archivos a $FINAL_PATH."
+    echo "❌ Error al mover los archivos a ${FINAL_PATH}."
     exit 4
 fi
 
-echo "✅ IX30 Modbus Bridge instalado correctamente en $FINAL_PATH."
+echo "✅ ${APP_NAME} instalado correctamente en ${FINAL_PATH}."
 
+# ================================
+# EJECUCIÓN DE LA APLICACIÓN
+# ================================
 
-echo "desea ejecutar el puente modbus ahora? (s/n)"
+echo "¿Desea ejecutar el puente modbus ahora? (s/n)"
 read RESPUESTA
-if [[ "$RESPUESTA" == "s" || "$RESPUESTA" == "S" ]]; then
-    echo "Iniciando IX30 Modbus Bridge..."
-    OLD_PID=$(ps | grep "python3 /opt/custom/main/main.py" | grep -v grep | awk '{print $1}')
 
-    for pid in $OLD_PID; do
-        echo "Encontrada instancia en ejecución del puente modbus (PID: $pid)"
-        if [ -n "$pid" ]; then
-            echo "Deteniendo instancia anterior del puente modbus (PID: $pid)..."
-            kill -9 "$pid"
+if [[ "${RESPUESTA}" == "s" || "${RESPUESTA}" == "S" ]]; then
+    echo "Iniciando ${APP_NAME}..."
+    
+    # Buscar procesos existentes
+    OLD_PID=$(${PS_CMD} | ${GREP_CMD} "${APP_EXECUTABLE}" | ${GREP_CMD} -v ${GREP_CMD} | ${AWK_CMD} '{print $1}')
+
+    for pid in ${OLD_PID}; do
+        echo "Encontrada instancia en ejecución del puente modbus (PID: ${pid})"
+        if [ -n "${pid}" ]; then
+            echo "Deteniendo instancia anterior del puente modbus (PID: ${pid})..."
+            ${KILL_CMD} -9 "${pid}"
             sleep 2
         fi
 
-        if ps -p "$pid" > /dev/null 2>&1; then
+        if ${PS_CMD} -p "${pid}" > /dev/null 2>&1; then
             echo "⚠️  Forzando terminación del proceso..."
-            kill -9 "$pid"
+            ${KILL_CMD} -9 "${pid}"
             sleep 2
         fi
     done
 
-    python3 /opt/custom/main/main.py > /dev/null 2>&1 &
+    # Ejecutar nueva instancia
+    ${APP_EXECUTABLE} > /dev/null 2>&1 &
 
     if [ $? -ne 0 ]; then
         echo "❌ Error al iniciar el puente modbus."
         exit 5
     fi
+    
     echo "✅ Puente modbus iniciado correctamente."
-    ps | grep "python3 /opt/custom/main/main.py" | grep -v grep 
+    ${PS_CMD} | ${GREP_CMD} "${APP_EXECUTABLE}" | ${GREP_CMD} -v ${GREP_CMD}
 else
     echo "Puedes iniciar el puente modbus más tarde ejecutando:"
-    echo "python3 /opt/custom/main/main.py &"
+    echo "${APP_EXECUTABLE} &"
 fi
 
 exit 0
