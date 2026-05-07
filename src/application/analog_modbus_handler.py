@@ -34,9 +34,8 @@ class AnalogModbusHandler:
         # Canales con lectura directa vs. muestreo en background
         self.DIRECT_CHANNELS = {1, 2}
         self.SAMPLED_CHANNELS = {3, 4}
-        self.MIN_SAMPLES = 100          # muestras mínimas en 1 segundo
-        self.SAMPLE_WINDOW = 1.0        # ventana de tiempo en segundos
-        self.SAMPLE_INTERVAL = self.SAMPLE_WINDOW / self.MIN_SAMPLES  # tiempo de espera entre muestras (s)
+        self.SAMPLE_WINDOW = 30.0       # ventana de tiempo en segundos (máx. muestras posibles)
+        self.MIN_SAMPLES = 1            # mínimo para considerar la lectura válida
 
         # Buffers de muestreo para canales 3 y 4: deque de (timestamp, valor)
         self._sample_buffers: Dict[int, Deque[Tuple[float, float]]] = {
@@ -46,7 +45,7 @@ class AnalogModbusHandler:
             ch: threading.Lock() for ch in self.SAMPLED_CHANNELS
         }
         self._sampling_active = False
-        self._sampling_thread: threading.Thread | None = None
+        self._sampling_threads: Dict[int, threading.Thread] = {}
 
         # Mapeo: Canal Analógico -> Dirección base del primer register (2 registers por canal)
         self._analog_mapping: Dict[int, int] = {
@@ -59,49 +58,54 @@ class AnalogModbusHandler:
         self._is_running = False
 
         _logger.info("AnalogModbusHandler inicializado - 2 registros por canal para float32")
-        _logger.info(f"Canales directos: {self.DIRECT_CHANNELS} | Canales muestreados: {self.SAMPLED_CHANNELS} (min {self.MIN_SAMPLES} muestras/s, intervalo {self.SAMPLE_INTERVAL*1000:.2f} ms)")
+        _logger.info(f"Canales directos: {self.DIRECT_CHANNELS} | Canales muestreados: {self.SAMPLED_CHANNELS} (ventana: {self.SAMPLE_WINDOW}s, muestreo continuo sin sleep)")
 
     # ------------------------------------------------------------------ #
     #  Muestreo en background para canales 3 y 4                           #
     # ------------------------------------------------------------------ #
 
     def start_sampling(self) -> None:
-        """Arrancar el hilo de muestreo continuo para los canales muestreados."""
+        """Arrancar un hilo de muestreo independiente por cada canal muestreado."""
         if self._sampling_active:
             return
         self._sampling_active = True
-        self._sampling_thread = threading.Thread(
-            target=self._sampling_loop,
-            daemon=True,
-            name="AnalogSamplingThread"
-        )
-        self._sampling_thread.start()
-        _logger.info("Hilo de muestreo analógico iniciado para canales %s", self.SAMPLED_CHANNELS)
+        for ch in self.SAMPLED_CHANNELS:
+            t = threading.Thread(
+                target=self._channel_sampling_loop,
+                args=(ch,),
+                daemon=True,
+                name=f"AnalogSamplingThread-ch{ch}"
+            )
+            self._sampling_threads[ch] = t
+            t.start()
+        _logger.info("Hilos de muestreo analógico iniciados para canales %s", self.SAMPLED_CHANNELS)
 
     def stop_sampling(self) -> None:
-        """Detener el hilo de muestreo."""
+        """Detener todos los hilos de muestreo."""
         self._sampling_active = False
-        if self._sampling_thread and self._sampling_thread.is_alive():
-            self._sampling_thread.join(timeout=2)
-        _logger.info("Hilo de muestreo analógico detenido")
+        for t in self._sampling_threads.values():
+            if t.is_alive():
+                t.join(timeout=2)
+        self._sampling_threads.clear()
+        _logger.info("Hilos de muestreo analógico detenidos")
 
-    def _sampling_loop(self) -> None:
-        """Bucle de muestreo: lee canales 3 y 4 lo más rápido posible y mantiene
-        una ventana deslizante de 1 segundo en cada buffer."""
+    def _channel_sampling_loop(self, ch: int) -> None:
+        """Bucle de muestreo dedicado a un único canal: mantiene una ventana
+        deslizante de SAMPLE_WINDOW segundos en el buffer del canal.
+        No aplica sleep artificial — el hardware actúa como limitante natural."""
         while self._sampling_active:
             now = time.monotonic()
             cutoff = now - self.SAMPLE_WINDOW
-            for ch in self.SAMPLED_CHANNELS:
-                try:
-                    value = self.analog_port.read_analog(ch)
-                    with self._sample_locks[ch]:
-                        self._sample_buffers[ch].append((now, value))
-                        # Descartar muestras fuera de la ventana
-                        while self._sample_buffers[ch] and self._sample_buffers[ch][0][0] < cutoff:
-                            self._sample_buffers[ch].popleft()
-                except Exception as e:
-                    _logger.debug("Error muestreando canal %s en background: %s", ch, e)
-            time.sleep(self.SAMPLE_INTERVAL)
+            try:
+                value = self.analog_port.read_analog(ch)
+                with self._sample_locks[ch]:
+                    self._sample_buffers[ch].append((now, value))
+                    # Descartar muestras fuera de la ventana
+                    while self._sample_buffers[ch] and self._sample_buffers[ch][0][0] < cutoff:
+                        self._sample_buffers[ch].popleft()
+            except Exception as e:
+                _logger.warning("Error muestreando canal %s en background: %s", ch, e)
+                time.sleep(0.05)  # pausa breve solo si hay error, para no saturar logs
 
     
     def get_modbus_addresses(self, analog_channel: int) -> Tuple[int, int]:
@@ -206,17 +210,15 @@ class AnalogModbusHandler:
         with self._sample_locks[analog_channel]:
             recent = [(t, v) for t, v in self._sample_buffers[analog_channel] if t >= cutoff]
 
-        if len(recent) < self.MIN_SAMPLES:
+        if not recent:
             raise RuntimeError(
-                f"Canal {analog_channel}: muestras insuficientes "
-                f"({len(recent)}/{self.MIN_SAMPLES}) en el último segundo. "
+                f"Canal {analog_channel}: sin muestras en la ventana de {self.SAMPLE_WINDOW}s. "
                 "Asegúrese de que el hilo de muestreo esté activo."
             )
 
         avg = sum(v for _, v in recent) / len(recent)
-        _logger.debug(
-            f"Canal {analog_channel} (muestreado): promedio={avg:.6f} "
-            f"sobre {len(recent)} muestras"
+        _logger.info(
+            f"Canal {analog_channel} (muestreado): {len(recent)} muestras en {self.SAMPLE_WINDOW}s → promedio={avg:.6f}"
         )
         return avg
     
@@ -279,6 +281,16 @@ class AnalogSyncService:
 
         # Arrancar muestreo en background para canales muestreados (3 y 4)
         self.handler.start_sampling()
+        # Esperar hasta tener al menos 1 muestra en cada canal muestreado (máx. 10s)
+        _logger.info("Esperando primera muestra de canales muestreados...")
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            if all(len(self.handler._sample_buffers[ch]) > 0
+                   for ch in self.handler.SAMPLED_CHANNELS):
+                break
+            time.sleep(0.1)
+        else:
+            _logger.warning("Tiempo de espera agotado esperando muestras iniciales; continuando de todos modos.")
         try:
             while self._is_running:
                 try:
