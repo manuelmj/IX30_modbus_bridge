@@ -35,12 +35,33 @@ Esta integración nos permite conectar el IX30 con sistemas SCADA, PLCs u otros 
 | GPIO 4      | Coil 4      | Digital I/O |
 
 ### Analógico ↔ Modbus Holding Registers
-| Canal Analógico | Holding Registers | Tipo de Dato |
-|-----------------|------------------|--------------|
-| Canal 1         | 40001-40002      | Float32 (2 registros) |
-| Canal 2         | 40003-40004      | Float32 (2 registros) |
-| Canal 3         | 40005-40006      | Float32 (2 registros) |
-| Canal 4         | 40007-40008      | Float32 (2 registros) |
+| Canal Analógico | Holding Registers | Tipo de Dato          | Modo de lectura              |
+|-----------------|------------------|-----------------------|------------------------------|
+| Canal 1         | 40001-40002      | Float32 (2 registros) | Lectura directa instantánea  |
+| Canal 2         | 40003-40004      | Float32 (2 registros) | Lectura directa instantánea  |
+| Canal 3         | 40005-40006      | Float32 (2 registros) | Promedio de ≥100 muestras/s  |
+| Canal 4         | 40007-40008      | Float32 (2 registros) | Promedio de ≥100 muestras/s  |
+
+#### Modos de lectura analógica
+
+**Canales 1 y 2 — Lectura directa**  
+En cada ciclo de sincronización se realiza **una única lectura** del hardware y ese valor se escribe directamente en los holding registers correspondientes.
+
+**Canales 3 y 4 — Lectura promediada con muestreo en background**  
+Un hilo dedicado (`AnalogSamplingThread`) muestrea los canales 3 y 4 de forma continua, manteniendo una **ventana deslizante de 1 segundo**. En cada ciclo de sincronización se verifica que existan al menos **100 muestras** dentro de esa ventana; si se cumple la condición, se calcula el promedio y se escribe en los registros. Si no hay suficientes muestras se registra un error y se continúa con el siguiente canal.
+
+```
+[AnalogSamplingThread - continuo]          [AnalogSyncService - cada interval s]
+  Lee canal 3 y 4 lo más rápido posible      Para canal 1/2: lectura directa
+  Guarda (timestamp, valor) en deque    →    Para canal 3/4: promedio del deque
+  Descarta muestras > 1 s de antigüedad →    Escribe resultado en holding registers
+
+[Cliente Modbus externo]
+  Lee 40001-40002 / 40003-40004 → último valor puntual
+  Lee 40005-40006 / 40007-40008 → último promedio calculado
+```
+
+> **Nota:** el intervalo de actualización de los registros está controlado por el parámetro `interval` de `AnalogSyncService` (por defecto 5 s). Reducirlo a `interval=1` actualiza los registros cada segundo con el promedio más reciente.
 
 ## 🚀 Instalación y Despliegue
 
