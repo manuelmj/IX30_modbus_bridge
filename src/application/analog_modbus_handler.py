@@ -36,6 +36,7 @@ class AnalogModbusHandler:
         self.SAMPLED_CHANNELS = {3, 4}
         self.MIN_SAMPLES = 100          # muestras mínimas en 1 segundo
         self.SAMPLE_WINDOW = 1.0        # ventana de tiempo en segundos
+        self.SAMPLE_INTERVAL = self.SAMPLE_WINDOW / self.MIN_SAMPLES  # tiempo de espera entre muestras (s)
 
         # Buffers de muestreo para canales 3 y 4: deque de (timestamp, valor)
         self._sample_buffers: Dict[int, Deque[Tuple[float, float]]] = {
@@ -58,7 +59,7 @@ class AnalogModbusHandler:
         self._is_running = False
 
         _logger.info("AnalogModbusHandler inicializado - 2 registros por canal para float32")
-        _logger.info(f"Canales directos: {self.DIRECT_CHANNELS} | Canales muestreados: {self.SAMPLED_CHANNELS} (min {self.MIN_SAMPLES} muestras/s)")
+        _logger.info(f"Canales directos: {self.DIRECT_CHANNELS} | Canales muestreados: {self.SAMPLED_CHANNELS} (min {self.MIN_SAMPLES} muestras/s, intervalo {self.SAMPLE_INTERVAL*1000:.2f} ms)")
 
     # ------------------------------------------------------------------ #
     #  Muestreo en background para canales 3 y 4                           #
@@ -100,7 +101,8 @@ class AnalogModbusHandler:
                             self._sample_buffers[ch].popleft()
                 except Exception as e:
                     _logger.debug("Error muestreando canal %s en background: %s", ch, e)
-     
+            time.sleep(self.SAMPLE_INTERVAL)
+
     
     def get_modbus_addresses(self, analog_channel: int) -> Tuple[int, int]:
         """
